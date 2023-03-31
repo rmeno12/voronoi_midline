@@ -36,5 +36,6 @@ include_directories(src/config_reader/include)
 include_directories(src)
 
 rosbuild_add_executable(voronoi
-			src/voronoi/voronoi_main.cpp)
+			src/voronoi/voronoi_main.cpp
+      src/voronoi/voronoi.cpp)
 target_link_libraries(voronoi ${libs})
