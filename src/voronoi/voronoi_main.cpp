@@ -20,6 +20,16 @@ std::unique_ptr<voronoi::Voronoi> vor_;
 
 void LaserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   static std::vector<Vector2f> cloud;
+
+  // TODO: only do this update if the robot has moved enough
+  cloud.clear();
+  for (size_t i = 0; i < msg->ranges.size(); i++) {
+    float angle = msg->angle_min + i * msg->angle_increment;
+    float range = msg->ranges[i];
+    if (range < msg->range_min || range >= msg->range_max) continue;
+    cloud.emplace_back(range * cos(angle) + kLaserOffset.x(),
+                       range * sin(angle) + kLaserOffset.y());
+  }
   vor_->UpdatePointcloud(cloud);
 }
 
