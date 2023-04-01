@@ -18,6 +18,8 @@ DEFINE_double(scale, 100, "Scale factor for voronoi diagram");
 
 CumulativeFunctionTimer voronoi_timer_("point_cloud_update");
 
+bool kDebug = false;
+
 float PointDistance(const boost::polygon::voronoi_edge<double>& edge,
                     const Eigen::Vector2f& point) {
   Eigen::Vector2f s(edge.vertex0()->x(), edge.vertex0()->y());
@@ -63,35 +65,19 @@ void Voronoi::UpdatePointcloud(const std::vector<Eigen::Vector2f>& pointcloud) {
     points.emplace_back(vertex.x(), vertex.y());
   }
   sort(points.begin(), points.end(), CompareVectors);
-  Eigen::MatrixXf edges(points.size(), points.size());
-  PruneEdges(pointcloud_, points, vd.edges(), edges);
+  PruneEdges(points, vd.edges());
   voronoi_vertices_ = points;
-  pruned_voronoi_edges_ = edges;
 
   UpdateMidline();
 }
 
-void Voronoi::UpdateMidline() {
-  // find the point closest to (0, 0), which is car's location in local frame
-  // int best = 0;
-  // float best_dist = voronoi_vertices_[0].norm();
-  // for (size_t i = 1; i < voronoi_vertices_.size(); i++) {
-  //   float dist = voronoi_vertices_[i].norm();
-  //   if (dist < best_dist) {
-  //     best = i;
-  //     best_dist = dist;
-  //   }
-  // }
-
-  // greedily pick the edge with the highest clearance until the cumulative
-  // length of the edges is greater than the lookahead distance
-}
-
-void PruneEdges(
-    const std::vector<Eigen::Vector2f>& clearance_points,
+void Voronoi::PruneEdges(
     const std::vector<Eigen::Vector2f>& vor_points,
-    const std::vector<boost::polygon::voronoi_edge<double>>& vor_edges,
-    Eigen::MatrixXf& edges) {
+    const std::vector<boost::polygon::voronoi_edge<double>>& vor_edges) {
+  Eigen::MatrixXf edges =
+      Eigen::MatrixXf::Zero(vor_points.size(), vor_points.size());
+  std::vector<bool> pruned_vertices(vor_points.size(), true);
+  int count = 0;
   // (loop is parallelizable)
   for (const auto& edge : vor_edges) {
     if (edge.is_primary() && edge.is_finite()) {
@@ -102,9 +88,13 @@ void PruneEdges(
 
       // this loop could be parallelized too
       bool prune = false;
-      for (const auto& point : clearance_points) {
-        if (PointDistance(edge, point) < FLAGS_scale * FLAGS_edge_threshold) {
+      float min_clearance = 1000;
+      for (const auto& point : pointcloud_) {
+        float clearance = PointDistance(edge, point) / FLAGS_scale;
+        if (clearance < min_clearance) min_clearance = clearance;
+        if (clearance < FLAGS_edge_threshold) {
           prune = true;
+          count++;
           break;
         }
       }
@@ -120,11 +110,68 @@ void PruneEdges(
                     Eigen::Vector2f(edge.vertex1()->x(), edge.vertex1()->y()),
                     CompareVectors) -
                 vor_points.begin();
-        edges(u, v) = 1;
-        edges(v, u) = 1;
+        edges(u, v) = min_clearance;
+        edges(v, u) = min_clearance;
+        pruned_vertices[u] = false;
+        pruned_vertices[v] = false;
       }
     }
   }
+  LOG_IF(INFO, kDebug) << "pruned " << count << " edges out of "
+                       << vor_edges.size();
+
+  pruned_voronoi_edges_ = edges;
+  pruned_voronoi_vertices_ = pruned_vertices;
+}
+
+void Voronoi::UpdateMidline() {
+  // find the unpruned point closest to (0, 0), which is car's location
+  int best = -1;
+  float best_dist = 1e6;
+  for (size_t i = 1; i < voronoi_vertices_.size(); i++) {
+    if (pruned_voronoi_vertices_[i]) continue;
+    float dist = voronoi_vertices_[i].norm();
+    if (dist < best_dist) {
+      best = i;
+      best_dist = dist;
+    }
+  }
+
+  if (best == -1) {
+    LOG_IF(WARNING, kDebug) << "no unpruned vertices";
+    midline_.clear();
+    return;
+  }
+
+  // greedily pick the edge with the highest clearance until the cumulative
+  // length of the edges is greater than the lookahead distance
+  float total_length = 0;
+  std::vector<Eigen::Vector2f> midline;
+  midline.push_back(voronoi_vertices_[best] / FLAGS_scale);
+  while (total_length < FLAGS_midline_lookahead) {
+    float best_clearance = 0;
+    int best_edge = -1;
+    for (size_t i = 0; i < voronoi_vertices_.size(); i++) {
+      // force path forward for the first edge
+      if (total_length == 0 && voronoi_vertices_[i].x() < 0) continue;
+      if (pruned_voronoi_edges_(best, i) > best_clearance) {
+        best_clearance = pruned_voronoi_edges_(best, i);
+        best_edge = i;
+      }
+    }
+    if (best_edge == -1) {
+      LOG_IF(INFO, kDebug) << "no more edges";
+      break;
+    }
+    total_length +=
+        (voronoi_vertices_[best] - voronoi_vertices_[best_edge]).norm() /
+        FLAGS_scale;
+    midline.push_back(voronoi_vertices_[best_edge] / FLAGS_scale);
+    best = best_edge;
+  }
+  LOG_IF(INFO, kDebug) << "midline length: " << total_length;
+
+  midline_ = midline;
 }
 
 }  // namespace voronoi
