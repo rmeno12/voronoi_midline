@@ -90,7 +90,8 @@ void Voronoi::PruneEdges(
       bool prune = false;
       float min_clearance = 1000;
       for (const auto& point : pointcloud_) {
-        float clearance = PointDistance(edge, point) / FLAGS_scale;
+        float clearance =
+            PointDistance(edge, point * FLAGS_scale) / FLAGS_scale;
         if (clearance < min_clearance) min_clearance = clearance;
         if (clearance < FLAGS_edge_threshold) {
           prune = true;
