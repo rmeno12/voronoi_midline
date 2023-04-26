@@ -20,6 +20,13 @@ class Voronoi {
 
  public:
   void UpdatePointcloud(const std::vector<Eigen::Vector2f>& pointcloud);
+
+  std::vector<Eigen::Vector2f> GetVoronoiVertices() const {
+    return voronoi_vertices_;
+  }
+  Eigen::MatrixXf GetPrunedVoronoiEdges() const {
+    return pruned_voronoi_edges_;
+  }
   std::vector<Eigen::Vector2f> GetMidline() const { return midline_; }
 };
 

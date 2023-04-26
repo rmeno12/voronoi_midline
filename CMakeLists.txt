@@ -27,6 +27,8 @@ message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
+find_package(OpenCV REQUIRED)
+
 set(libs roslib roscpp rosbag glog gflags amrl_shared_lib boost_system lua5.1
     pthread)
 
@@ -34,8 +36,14 @@ add_subdirectory(src/shared)
 include_directories(src/shared)
 include_directories(src/config_reader/include)
 include_directories(src)
+include_directories(${OpenCV_INCLUDE_DIRS})
 
 rosbuild_add_executable(voronoi
 			src/voronoi/voronoi_main.cpp
       src/voronoi/voronoi.cpp)
-target_link_libraries(voronoi ${libs})
+target_link_libraries(voronoi ${libs} ${OpenCV_LIBS})
+
+
+rosbuild_add_executable(voronoi_vis
+			src/voronoi/voronoi_vis.cpp)
+target_link_libraries(voronoi_vis ${libs} ${OpenCV_LIBS})

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <boost/polygon/voronoi.hpp>
+#include <unordered_set>
 
 #include "shared/util/timer.h"
 
@@ -139,7 +140,7 @@ void Voronoi::UpdateMidline() {
   }
 
   if (best == -1) {
-    LOG_IF(WARNING, kDebug) << "no unpruned vertices";
+    LOG(WARNING) << "no unpruned vertices";
     midline_.clear();
     return;
   }
@@ -149,12 +150,18 @@ void Voronoi::UpdateMidline() {
   float total_length = 0;
   std::vector<Eigen::Vector2f> midline;
   midline.push_back(voronoi_vertices_[best] / FLAGS_scale);
+  std::unordered_set<int> visited;
+  visited.insert(best);
+  // TODO: don't revisit edges !!!!
   while (total_length < FLAGS_midline_lookahead) {
     float best_clearance = 0;
     int best_edge = -1;
     for (size_t i = 0; i < voronoi_vertices_.size(); i++) {
-      // force path forward for the first edge
-      if (total_length == 0 && voronoi_vertices_[i].x() < 0) continue;
+      // force path forward for a little bit
+      if (total_length == 0 &&
+          voronoi_vertices_[i].x() < voronoi_vertices_[best].x())
+        continue;
+      if (visited.find(i) != visited.end()) continue;  // don't revisit
       if (pruned_voronoi_edges_(best, i) > best_clearance) {
         best_clearance = pruned_voronoi_edges_(best, i);
         best_edge = i;
@@ -164,6 +171,7 @@ void Voronoi::UpdateMidline() {
       LOG_IF(INFO, kDebug) << "no more edges";
       break;
     }
+    visited.insert(best_edge);
     total_length +=
         (voronoi_vertices_[best] - voronoi_vertices_[best_edge]).norm() /
         FLAGS_scale;
