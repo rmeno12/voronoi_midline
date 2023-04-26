@@ -32,10 +32,12 @@ set(libs roslib roscpp rosbag glog gflags amrl_shared_lib boost_system lua5.1
 
 add_subdirectory(src/shared)
 include_directories(src/shared)
-include_directories(src/config_reader/include)
 include_directories(src)
+
+rosbuild_add_library(vis
+      src/visualization/visualization.cc)
 
 rosbuild_add_executable(voronoi
 			src/voronoi/voronoi_main.cpp
       src/voronoi/voronoi.cpp)
-target_link_libraries(voronoi ${libs})
+target_link_libraries(voronoi vis ${libs})
