@@ -4,21 +4,22 @@
 
 #include <algorithm>
 #include <boost/polygon/voronoi.hpp>
+#include <unordered_set>
 
 #include "shared/util/timer.h"
 
 using point = boost::polygon::point_data<double>;
 using voronoi_diagram = boost::polygon::voronoi_diagram<double>;
 
-namespace voronoi {
-
 DEFINE_double(edge_threshold, 0.25, "Threshold for pruning edges");
 DEFINE_double(midline_lookahead, 4, "Lookahead distance for midline");
 DEFINE_double(scale, 100, "Scale factor for voronoi diagram");
 
-CumulativeFunctionTimer voronoi_timer_("point_cloud_update");
+namespace voronoi {
 
-bool kDebug = false;
+CumulativeFunctionTimer voronoi_timer_("UpdatePointCloud");
+
+bool kDebug = true;
 
 float PointDistance(const boost::polygon::voronoi_edge<double>& edge,
                     const Eigen::Vector2f& point) {
@@ -52,10 +53,12 @@ void Voronoi::UpdatePointcloud(const std::vector<Eigen::Vector2f>& pointcloud) {
 
   // TODO: sample these constant density instead of every 10
   std::vector<point> vor_points;
-  for (size_t i = 0; i < pointcloud_.size(); i += 10)
+  for (size_t i = 0; i < pointcloud_.size(); i += 10) {
+    if (pointcloud_[i].norm() > 10) continue;
     // multiply here bc boost voronoi uses integers internally idk why
     vor_points.emplace_back(pointcloud_[i].x() * FLAGS_scale,
                             pointcloud_[i].y() * FLAGS_scale);
+  }
 
   voronoi_diagram vd;
   boost::polygon::construct_voronoi(vor_points.begin(), vor_points.end(), &vd);
@@ -131,6 +134,7 @@ void Voronoi::UpdateMidline() {
   float best_dist = 1e6;
   for (size_t i = 1; i < voronoi_vertices_.size(); i++) {
     if (pruned_voronoi_vertices_[i]) continue;
+    if (pruned_voronoi_edges_.row(i).sum() == 0) continue;
     float dist = voronoi_vertices_[i].norm();
     if (dist < best_dist) {
       best = i;
@@ -139,7 +143,7 @@ void Voronoi::UpdateMidline() {
   }
 
   if (best == -1) {
-    LOG_IF(WARNING, kDebug) << "no unpruned vertices";
+    LOG(WARNING) << "no unpruned vertices";
     midline_.clear();
     return;
   }
@@ -149,12 +153,15 @@ void Voronoi::UpdateMidline() {
   float total_length = 0;
   std::vector<Eigen::Vector2f> midline;
   midline.push_back(voronoi_vertices_[best] / FLAGS_scale);
+  std::unordered_set<int> visited;
+  visited.insert(best);
   while (total_length < FLAGS_midline_lookahead) {
     float best_clearance = 0;
     int best_edge = -1;
     for (size_t i = 0; i < voronoi_vertices_.size(); i++) {
       // force path forward for the first edge
       if (total_length == 0 && voronoi_vertices_[i].x() < 0) continue;
+      if (visited.count(i)) continue;
       if (pruned_voronoi_edges_(best, i) > best_clearance) {
         best_clearance = pruned_voronoi_edges_(best, i);
         best_edge = i;
@@ -164,12 +171,14 @@ void Voronoi::UpdateMidline() {
       LOG_IF(INFO, kDebug) << "no more edges";
       break;
     }
+    visited.insert(best_edge);
     total_length +=
         (voronoi_vertices_[best] - voronoi_vertices_[best_edge]).norm() /
         FLAGS_scale;
     midline.push_back(voronoi_vertices_[best_edge] / FLAGS_scale);
     best = best_edge;
   }
+  LOG_IF(INFO, kDebug) << "midline size: " << midline.size();
   LOG_IF(INFO, kDebug) << "midline length: " << total_length;
 
   midline_ = midline;

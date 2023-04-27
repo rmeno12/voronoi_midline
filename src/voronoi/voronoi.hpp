@@ -1,8 +1,12 @@
 #pragma once
 
+#include <gflags/gflags.h>
+
 #include <boost/polygon/voronoi.hpp>
 #include <eigen3/Eigen/Dense>
 #include <vector>
+
+DECLARE_double(scale);
 
 namespace voronoi {
 
@@ -20,6 +24,12 @@ class Voronoi {
 
  public:
   void UpdatePointcloud(const std::vector<Eigen::Vector2f>& pointcloud);
+  std::vector<Eigen::Vector2f> GetVoronoiVertices() const {
+    return voronoi_vertices_;
+  }
+  Eigen::MatrixXf GetPrunedVoronoiEdges() const {
+    return pruned_voronoi_edges_;
+  }
   std::vector<Eigen::Vector2f> GetMidline() const { return midline_; }
 };
 
