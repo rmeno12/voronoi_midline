@@ -1,0 +1,2 @@
+# voronoi-midline
+**Important**: If you use VSCode's devcontainer with this project, be sure to set the user id value in `.devcontainer/devcontainer.json` to your user id on the machine the container will run on. Similarly, when building the container manually, pass the `--build-arg HOST_UID=$(id -u)` flag.

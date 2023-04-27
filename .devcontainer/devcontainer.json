@@ -1,14 +1,14 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-dockerfile
 {
-	"name": "Existing Dockerfile",
+	"name": "Voronoi Midline",
 	"build": {
 		// Sets the run context to one level up instead of the .devcontainer folder.
 		"context": "..",
 		// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
 		"dockerfile": "../Dockerfile",
 		"args": {
-			"HOST_UID": "2019"
+			"HOST_UID": "2019" // !! Set this to your uid on whatever computer you run on !!
 		}
 	},
 	"runArgs": [
@@ -26,5 +26,14 @@
 			"requireLocalPort": true
 		}
 	},
-	"postStartCommand": "./tmux_session.sh"
+	"postStartCommand": "./tmux_session.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools",
+				"GitHub.copilot",
+				"VisualStudioExptTeam.vscodeintellicode"
+			]
+		}
+	}
 }
