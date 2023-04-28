@@ -129,13 +129,13 @@ void Voronoi::PruneEdges(
 }
 
 void Voronoi::UpdateMidline() {
-  // find the unpruned point closest to (0, 0), which is car's location
+  // find the first point in the edge
   int best = -1;
   float best_dist = 1e6;
   for (size_t i = 1; i < voronoi_vertices_.size(); i++) {
     if (pruned_voronoi_vertices_[i]) continue;
     if (pruned_voronoi_edges_.row(i).sum() == 0) continue;
-    float dist = voronoi_vertices_[i].norm();
+    float dist = voronoi_vertices_[i].norm();  // optimize for closest to car
     if (dist < best_dist) {
       best = i;
       best_dist = dist;
@@ -149,7 +149,8 @@ void Voronoi::UpdateMidline() {
   }
 
   // greedily pick the edge with the highest clearance until the cumulative
-  // length of the edges is greater than the lookahead distance
+  // length of the edges is greater than the lookahead distance or we run out of
+  // points to add (aka we hit a dead end)
   float total_length = 0;
   std::vector<Eigen::Vector2f> midline;
   midline.push_back(voronoi_vertices_[best] / FLAGS_scale);
