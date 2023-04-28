@@ -12,11 +12,11 @@
 		}
 	},
 	"runArgs": [
-		"--userns=keep-id"
+		"--userns=keep-id",
+		"--cap-add=SYS_PTRACE"
 	],
 	"workspaceMount": "source=${localWorkspaceFolder},target=/home/dev/workspace,type=bind",
 	"workspaceFolder": "/home/dev/workspace",
-	// ssh with -R 10272:localhost:10272 to be able to use webviz locally
 	"forwardPorts": [
 		10272
 	],

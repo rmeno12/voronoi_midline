@@ -11,7 +11,8 @@ RUN apt-get update && \
 RUN apt-get install -y ros-noetic-tf ros-noetic-angles
 
 ARG HOST_UID
-RUN useradd dev -m -s /bin/bash -u $HOST_UID -G sudo
+RUN useradd dev -m -s /bin/bash -u $HOST_UID -G sudo && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 USER dev
 WORKDIR /home/dev
 RUN rosdep update
