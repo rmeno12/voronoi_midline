@@ -26,7 +26,7 @@ ros::Publisher viz_pub_;
 }  // namespace
 
 void DrawMidline(const std::vector<Vector2f>& midline) {
-  for (size_t i = 0; i < midline.size() - 1; i++) {
+  for (int i = 0; i < (int)midline.size() - 1; i++) {
     const auto& p1 = midline[i];
     const auto& p2 = midline[i + 1];
     visualization::DrawLine(p1, p2, 0xff0000, local_viz_msg_);
@@ -76,6 +76,7 @@ void LaserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   visualization::ClearVisualizationMsg(local_viz_msg_);
   DrawVoronoi(vor_->GetVoronoiVertices(), vor_->GetPrunedVoronoiEdges());
   DrawMidline(midline);
+  visualization::DrawCross(vor_->GetGoal(), 0.25, 0x0000ff, local_viz_msg_);
   viz_pub_.publish(local_viz_msg_);
 }
 

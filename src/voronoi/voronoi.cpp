@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <boost/polygon/voronoi.hpp>
+#include <queue>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "shared/util/timer.h"
@@ -14,6 +16,8 @@ using voronoi_diagram = boost::polygon::voronoi_diagram<double>;
 DEFINE_double(edge_threshold, 0.25, "Threshold for pruning edges");
 DEFINE_double(midline_lookahead, 4, "Lookahead distance for midline");
 DEFINE_double(scale, 100, "Scale factor for voronoi diagram");
+
+DEFINE_double(off_graph_multiplier, 10, "Multiplier for off graph edges");
 
 namespace voronoi {
 
@@ -128,8 +132,7 @@ void Voronoi::PruneEdges(
   pruned_voronoi_vertices_ = pruned_vertices;
 }
 
-void Voronoi::UpdateMidline() {
-  // find the first point in the edge
+int Voronoi::FindStartVertex() const {
   int best = -1;
   float best_dist = 1e6;
   for (size_t i = 1; i < voronoi_vertices_.size(); i++) {
@@ -142,47 +145,77 @@ void Voronoi::UpdateMidline() {
     }
   }
 
+  return best;
+}
+
+// TODO: improve goal point selection (gap follower algorithm maybe?)
+Eigen::Vector2f Voronoi::FindGoalPoint() const {
+  return {FLAGS_midline_lookahead, 0};
+}
+
+void Voronoi::UpdateMidline() {
+  int best = FindStartVertex();
   if (best == -1) {
     LOG(WARNING) << "no unpruned vertices";
     midline_.clear();
     return;
   }
 
-  // greedily pick the edge with the highest clearance until the cumulative
-  // length of the edges is greater than the lookahead distance or we run out of
-  // points to add (aka we hit a dead end)
-  float total_length = 0;
+  goal_ = FindGoalPoint();
   std::vector<Eigen::Vector2f> midline;
-  midline.push_back(voronoi_vertices_[best] / FLAGS_scale);
-  std::unordered_set<int> visited;
-  visited.insert(best);
-  while (total_length < FLAGS_midline_lookahead) {
-    float best_clearance = 0;
-    int best_edge = -1;
-    for (size_t i = 0; i < voronoi_vertices_.size(); i++) {
-      // force path forward for the first edge
-      if (total_length == 0 && voronoi_vertices_[i].x() < 0) continue;
-      if (visited.count(i)) continue;
-      if (pruned_voronoi_edges_(best, i) > best_clearance) {
-        best_clearance = pruned_voronoi_edges_(best, i);
-        best_edge = i;
+  std::priority_queue<std::pair<float, int>> q;
+  std::unordered_map<int, float> costs;
+  std::unordered_map<int, int> parents;
+
+  q.emplace(0, best);
+  costs[best] = 0;
+  parents[best] = best;
+
+  while (!q.empty()) {
+    int cnode = q.top().second;
+    q.pop();
+
+    Eigen::Vector2f cpos = voronoi_vertices_[cnode] / FLAGS_scale;
+
+    if (cnode == -1) {
+      // don't include the off-graph goal in the midline
+      cnode = parents[cnode];
+      while (cnode != best) {
+        midline.push_back(voronoi_vertices_[cnode] / FLAGS_scale);
+        cnode = parents[cnode];
       }
-    }
-    if (best_edge == -1) {
-      LOG_IF(INFO, kDebug) << "no more edges";
+      std::reverse(midline.begin(), midline.end());
       break;
     }
-    visited.insert(best_edge);
-    total_length +=
-        (voronoi_vertices_[best] - voronoi_vertices_[best_edge]).norm() /
-        FLAGS_scale;
-    midline.push_back(voronoi_vertices_[best_edge] / FLAGS_scale);
-    best = best_edge;
+
+    // make neighbors
+    std::vector<int> neighbors;
+    for (size_t i = 0; i < voronoi_vertices_.size(); i++) {
+      if (i == (size_t)cnode) continue;
+      if (pruned_voronoi_edges_(cnode, i) == 0) continue;
+      neighbors.push_back(i);
+    }
+    // -1 represents goal, always in neighbors just has a high cost to go to
+    neighbors.push_back(-1);
+
+    for (const int n_idx : neighbors) {
+      Eigen::Vector2f npos =
+          n_idx == -1 ? goal_ : voronoi_vertices_[n_idx] / FLAGS_scale;
+      float dist =
+          (cpos - npos).norm() * (n_idx == -1 ? FLAGS_off_graph_multiplier : 1);
+      float g = costs[cnode] + dist;
+      if (costs.find(n_idx) == costs.end() || g < costs[n_idx]) {
+        float h = (npos - goal_).norm();
+        float f = g + h;
+        costs[n_idx] = g;
+        parents[n_idx] = cnode;
+        q.emplace(-f, n_idx);
+      }
+    }
   }
-  LOG_IF(INFO, kDebug) << "midline size: " << midline.size();
-  LOG_IF(INFO, kDebug) << "midline length: " << total_length;
 
   midline_ = midline;
+  LOG_IF(INFO, kDebug) << "midline size: " << midline_.size();
 }
 
 }  // namespace voronoi

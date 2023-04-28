@@ -16,10 +16,13 @@ class Voronoi {
   Eigen::MatrixXf pruned_voronoi_edges_;
   std::vector<bool> pruned_voronoi_vertices_;
   std::vector<Eigen::Vector2f> midline_;
+  Eigen::Vector2f goal_;
 
   void PruneEdges(
       const std::vector<Eigen::Vector2f>& vor_points,
       const std::vector<boost::polygon::voronoi_edge<double>>& vor_edges);
+  int FindStartVertex() const;
+  Eigen::Vector2f FindGoalPoint() const;
   void UpdateMidline();
 
  public:
@@ -31,6 +34,7 @@ class Voronoi {
     return pruned_voronoi_edges_;
   }
   std::vector<Eigen::Vector2f> GetMidline() const { return midline_; }
+  Eigen::Vector2f GetGoal() const { return goal_; }
 };
 
 }  // namespace voronoi
