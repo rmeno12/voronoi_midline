@@ -36,8 +36,8 @@ RUN echo "source /opt/ros/noetic/setup.bash\n" \
 
 
 # build deps (pre text messages)
-RUN /bin/bash -lc "cd amrl_msgs && git checkout cfe1e3d && make"
-RUN /bin/bash -lc "cd ut_automata && git checkout 7c45b66 && make"
+RUN /bin/bash -lc "cd amrl_msgs && git pull && make"
+RUN /bin/bash -lc "cd ut_automata && git pull && make"
 
 # add launcher
 ENV CS378_DOCKER_CONTEXT 1

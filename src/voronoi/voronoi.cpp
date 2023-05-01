@@ -58,7 +58,6 @@ void Voronoi::UpdatePointcloud(const std::vector<Eigen::Vector2f>& pointcloud) {
   // TODO: sample these constant density instead of every 10
   std::vector<point> vor_points;
   for (size_t i = 0; i < pointcloud_.size(); i += 10) {
-    if (pointcloud_[i].norm() > 10) continue;
     // multiply here bc boost voronoi uses integers internally idk why
     vor_points.emplace_back(pointcloud_[i].x() * FLAGS_scale,
                             pointcloud_[i].y() * FLAGS_scale);
@@ -150,7 +149,21 @@ int Voronoi::FindStartVertex() const {
 
 // TODO: improve goal point selection (gap follower algorithm maybe?)
 Eigen::Vector2f Voronoi::FindGoalPoint() const {
-  return {FLAGS_midline_lookahead, 0};
+  if (pointcloud_.empty()) return {FLAGS_midline_lookahead, 0};
+  // only look in front of the car (this is pretty bad)
+  static const size_t start_i = 180;
+  static const size_t end_i = 900;
+  std::vector<float> disparities(pointcloud_.size());
+  float maxd = 0;
+  int maxi = 0;
+  for (size_t i = start_i; i < end_i; i++) {
+    disparities[i] = (pointcloud_[i + 1] - pointcloud_[i]).norm();
+    if (disparities[i] > maxd) {
+      maxd = disparities[i];
+      maxi = i;
+    }
+  }
+  return (pointcloud_[maxi] + pointcloud_[maxi + 1]) / 2;
 }
 
 void Voronoi::UpdateMidline() {

@@ -53,7 +53,8 @@ void LaserCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
   cloud.clear();
   for (size_t i = 0; i < msg->ranges.size(); i++) {
     float angle = msg->angle_min + i * msg->angle_increment;
-    float range = msg->ranges[i];
+    float range =
+        std::min(std::max(msg->ranges[i], msg->range_min), msg->range_max);
     cloud.emplace_back(range * cos(angle) + kLaserOffset.x(),
                        range * sin(angle) + kLaserOffset.y());
   }
