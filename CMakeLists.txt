@@ -1,5 +1,5 @@
 project(speedway)
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.10)
 
 message(STATUS "Using compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")

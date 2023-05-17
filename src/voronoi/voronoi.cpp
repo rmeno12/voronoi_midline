@@ -227,7 +227,16 @@ void Voronoi::UpdateMidline() {
     }
   }
 
-  midline_ = midline;
+  midline_.clear();
+  if (midline.size() == 0) return;
+  float t = 0;
+  midline_.push_back(midline[0]);
+  for (size_t i = 1; i < midline.size(); i++) {
+    t += (midline[i] - midline[i - 1]).norm();
+    if (t > FLAGS_midline_lookahead) break;
+    midline_.push_back(midline[i]);
+  }
+
   LOG_IF(INFO, kDebug) << "midline size: " << midline_.size();
 }
 
